@@ -4,6 +4,7 @@ from database.config import get_db
 from database.models import Categoria
 from schemas.schemas import CategoriaCreate, CategoriaResponse, CategoriaUpdate
 from utils.logger import logger
+from core.config import settings
 
 router = APIRouter(prefix="/api/v1/categorias", tags=["Categorías"])
 
@@ -25,9 +26,10 @@ async def crear_categoria(categoria: CategoriaCreate, db: Session = Depends(get_
     except Exception as e:
         db.rollback()
         logger.error(f"Error al crear categoría: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al crear categoría"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al crear categoría"
+            detail=detail
         )
 
 
@@ -46,9 +48,10 @@ async def listar_categorias(
         
     except Exception as e:
         logger.error(f"Error al listar categorías: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al listar categorías"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al listar categorías"
+            detail=detail
         )
 
 
@@ -72,9 +75,10 @@ async def obtener_categoria(categoria_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"Error al obtener categoría: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al obtener categoría"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al obtener categoría"
+            detail=detail
         )
 
 
@@ -111,9 +115,10 @@ async def actualizar_categoria(
     except Exception as e:
         db.rollback()
         logger.error(f"Error al actualizar categoría: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al actualizar categoría"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al actualizar categoría"
+            detail=detail
         )
 
 
@@ -141,7 +146,8 @@ async def eliminar_categoria(categoria_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"Error al eliminar categoría: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al eliminar categoría"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al eliminar categoría"
+            detail=detail
         )

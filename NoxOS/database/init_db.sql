@@ -5,7 +5,8 @@
 -- Sistema de Pedidos por QR para Discotecas
 -- =====================
 
-CREATE DATABASE IF NOT EXISTS discoteca_app CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+DROP DATABASE IF EXISTS discoteca_app;
+CREATE DATABASE discoteca_app CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE discoteca_app;
 
 -- =====================
@@ -92,7 +93,7 @@ CREATE TABLE productos (
   activo BOOLEAN DEFAULT TRUE,
   categoria_id INT NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (categoria_id) REFERENCES categorias(id) ON DELETE RESTRICT,
+  FOREIGN KEY (categoria_id) REFERENCES categorias(id) ON DELETE CASCADE,
   INDEX idx_nombre (nombre),
   INDEX idx_activo (activo),
   INDEX idx_categoria_id (categoria_id)
@@ -120,7 +121,7 @@ CREATE TABLE pedidos (
   creado_por INT,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (estado_id) REFERENCES estados_pedido(id) ON DELETE RESTRICT,
-  FOREIGN KEY (mesa_id) REFERENCES mesas(id) ON DELETE RESTRICT,
+  FOREIGN KEY (mesa_id) REFERENCES mesas(id) ON DELETE CASCADE,
   FOREIGN KEY (creado_por) REFERENCES usuarios(id) ON DELETE CASCADE,
   INDEX idx_fecha_hora (fecha_hora),
   INDEX idx_estado_id (estado_id),
@@ -136,7 +137,7 @@ CREATE TABLE pedido_productos (
   cantidad_despachada INT NOT NULL DEFAULT 0,
   precio_unitario DECIMAL(10, 2) NOT NULL,
   FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE,
-  FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE RESTRICT,
+  FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE,
   INDEX idx_pedido_id (pedido_id),
   INDEX idx_producto_id (producto_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -149,7 +150,7 @@ CREATE TABLE movimientos_inventario (
   motivo VARCHAR(255),
   fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
   usuario_id INT,
-  FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE RESTRICT,
+  FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE,
   FOREIGN KEY (tipo_id) REFERENCES tipos_movimiento(id) ON DELETE RESTRICT,
   FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
   INDEX idx_producto_id (producto_id),

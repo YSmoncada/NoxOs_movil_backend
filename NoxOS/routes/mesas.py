@@ -4,6 +4,7 @@ from database.config import get_db
 from database.models import Mesa, EstadoMesa
 from schemas.schemas import MesaCreate, MesaResponse, MesaUpdate
 from utils.logger import logger
+from core.config import settings
 
 router = APIRouter(prefix="/api/v1/mesas", tags=["Mesas"])
 
@@ -43,9 +44,10 @@ async def crear_mesa(mesa: MesaCreate, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"Error al crear mesa: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al crear mesa"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al crear mesa"
+            detail=detail
         )
 
 
@@ -70,9 +72,10 @@ async def listar_mesas(
         
     except Exception as e:
         logger.error(f"Error al listar mesas: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al listar mesas"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al listar mesas"
+            detail=detail
         )
 
 
@@ -96,9 +99,10 @@ async def obtener_mesa(mesa_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"Error al obtener mesa: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al obtener mesa"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al obtener mesa"
+            detail=detail
         )
 
 
@@ -153,9 +157,10 @@ async def actualizar_mesa(
     except Exception as e:
         db.rollback()
         logger.error(f"Error al actualizar mesa: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al actualizar mesa"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al actualizar mesa"
+            detail=detail
         )
 
 
@@ -183,7 +188,8 @@ async def eliminar_mesa(mesa_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"Error al eliminar mesa: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al eliminar mesa"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al eliminar mesa"
+            detail=detail
         )

@@ -9,6 +9,7 @@ from schemas.schemas import (
     TipoMovimientoResponse, TipoFacturaResponse
 )
 from utils.logger import logger
+from core.config import settings
 
 router = APIRouter(prefix="/api/v1/datos", tags=["Datos"])
 
@@ -23,9 +24,10 @@ async def obtener_estados_mesa(db: Session = Depends(get_db)):
         return estados
     except Exception as e:
         logger.error(f"Error al obtener estados mesa: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al obtener estados"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al obtener estados"
+            detail=detail
         )
 
 
@@ -39,9 +41,10 @@ async def obtener_estados_pedido(db: Session = Depends(get_db)):
         return estados
     except Exception as e:
         logger.error(f"Error al obtener estados pedido: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al obtener estados"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al obtener estados"
+            detail=detail
         )
 
 
@@ -55,9 +58,10 @@ async def obtener_tipos_movimiento(db: Session = Depends(get_db)):
         return tipos
     except Exception as e:
         logger.error(f"Error al obtener tipos movimiento: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al obtener tipos"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al obtener tipos"
+            detail=detail
         )
 
 
@@ -71,7 +75,8 @@ async def obtener_tipos_factura(db: Session = Depends(get_db)):
         return tipos
     except Exception as e:
         logger.error(f"Error al obtener tipos factura: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al obtener tipos"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al obtener tipos"
+            detail=detail
         )

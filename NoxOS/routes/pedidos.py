@@ -7,6 +7,7 @@ from database.models import (
 )
 from schemas.schemas import PedidoCreate, PedidoResponse, PedidoUpdate
 from utils.logger import logger
+from core.config import settings
 
 router = APIRouter(prefix="/api/v1/pedidos", tags=["Pedidos"])
 
@@ -98,9 +99,10 @@ async def crear_pedido(pedido: PedidoCreate, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"Error al crear pedido: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al crear pedido"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al crear pedido"
+            detail=detail
         )
 
 
@@ -129,9 +131,10 @@ async def listar_pedidos(
         
     except Exception as e:
         logger.error(f"Error al listar pedidos: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al listar pedidos"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al listar pedidos"
+            detail=detail
         )
 
 
@@ -155,9 +158,10 @@ async def obtener_pedido(pedido_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"Error al obtener pedido: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al obtener pedido"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al obtener pedido"
+            detail=detail
         )
 
 
@@ -205,9 +209,10 @@ async def actualizar_pedido(
     except Exception as e:
         db.rollback()
         logger.error(f"Error al actualizar pedido: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al actualizar pedido"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al actualizar pedido"
+            detail=detail
         )
 
 
@@ -235,7 +240,8 @@ async def eliminar_pedido(pedido_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"Error al eliminar pedido: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al eliminar pedido"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al eliminar pedido"
+            detail=detail
         )

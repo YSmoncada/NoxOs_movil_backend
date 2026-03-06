@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database.config import get_db
 from database.models import Factura, Pedido, TipoFactura
-from schemas.schemas import FacturaCreate, FacturaResponse
+from schemas.schemas import FacturaCreate, FacturaResponse, FacturaUpdate
 from utils.logger import logger
 from datetime import datetime
+from core.config import settings
 
 router = APIRouter(prefix="/api/v1/facturas", tags=["Facturas"])
 
@@ -84,9 +85,10 @@ async def crear_factura(factura: FacturaCreate, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"Error al crear factura: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al crear factura"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al crear factura"
+            detail=detail
         )
 
 
@@ -111,9 +113,10 @@ async def listar_facturas(
         
     except Exception as e:
         logger.error(f"Error al listar facturas: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al listar facturas"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al listar facturas"
+            detail=detail
         )
 
 
@@ -137,9 +140,102 @@ async def obtener_factura(factura_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"Error al obtener factura: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al obtener factura"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al obtener factura"
+            detail=detail
+        )
+
+
+@router.put("/{factura_id}", response_model=FacturaResponse)
+async def actualizar_factura(
+    factura_id: int,
+    factura_update: FacturaUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Actualizar una factura (UPDATE)
+    """
+    try:
+        factura = db.query(Factura).filter(Factura.id == factura_id).first()
+
+        if not factura:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Factura no encontrada"
+            )
+
+        # Verificar número único si se cambia
+        if factura_update.numero and factura_update.numero != factura.numero:
+            numero_existente = db.query(Factura).filter(
+                Factura.numero == factura_update.numero
+            ).first()
+            if numero_existente:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Este número de factura ya está en uso"
+                )
+
+        # Verificar tipo de factura si se cambia
+        if factura_update.tipo_id:
+            tipo = db.query(TipoFactura).filter(TipoFactura.id == factura_update.tipo_id).first()
+            if not tipo:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Tipo de factura no encontrado"
+                )
+
+        # Actualizar campos
+        datos_actualizacion = factura_update.dict(exclude_unset=True)
+        for campo, valor in datos_actualizacion.items():
+            setattr(factura, campo, valor)
+
+        db.commit()
+        db.refresh(factura)
+
+        logger.info(f"Factura actualizada: {factura.numero}")
+        return factura
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error al actualizar factura: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al actualizar factura"
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=detail
+        )
+
+
+@router.delete("/{factura_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def eliminar_factura(factura_id: int, db: Session = Depends(get_db)):
+    """
+    Eliminar una factura (DELETE)
+    """
+    try:
+        factura = db.query(Factura).filter(Factura.id == factura_id).first()
+
+        if not factura:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Factura no encontrada"
+            )
+
+        db.delete(factura)
+        db.commit()
+
+        logger.info(f"Factura eliminada: {factura.numero}")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error al eliminar factura: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al eliminar factura"
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=detail
         )
 
 
@@ -150,20 +246,21 @@ async def generar_numero(tipo_id: int, db: Session = Depends(get_db)):
     """
     try:
         numero = generar_numero_factura(db, tipo_id)
-        
+
         if not numero:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Tipo de factura no encontrado"
             )
-        
+
         return {"numero": numero}
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error al generar número: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al generar número de factura"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al generar número de factura"
+            detail=detail
         )

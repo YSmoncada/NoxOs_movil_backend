@@ -4,6 +4,7 @@ from database.config import get_db
 from database.models import Producto, Categoria
 from schemas.schemas import ProductoCreate, ProductoResponse, ProductoUpdate
 from utils.logger import logger
+from core.config import settings
 
 router = APIRouter(prefix="/api/v1/productos", tags=["Productos"])
 
@@ -35,9 +36,10 @@ async def crear_producto(producto: ProductoCreate, db: Session = Depends(get_db)
     except Exception as e:
         db.rollback()
         logger.error(f"Error al crear producto: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al crear producto"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al crear producto"
+            detail=detail
         )
 
 
@@ -66,9 +68,10 @@ async def listar_productos(
         
     except Exception as e:
         logger.error(f"Error al listar productos: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al listar productos"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al listar productos"
+            detail=detail
         )
 
 
@@ -92,9 +95,10 @@ async def obtener_producto(producto_id: int, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         logger.error(f"Error al obtener producto: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al obtener producto"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al obtener producto"
+            detail=detail
         )
 
 
@@ -141,9 +145,10 @@ async def actualizar_producto(
     except Exception as e:
         db.rollback()
         logger.error(f"Error al actualizar producto: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al actualizar producto"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al actualizar producto"
+            detail=detail
         )
 
 
@@ -171,7 +176,8 @@ async def eliminar_producto(producto_id: int, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error(f"Error al eliminar producto: {str(e)}")
+        detail = str(e) if settings.DEBUG else "Error al eliminar producto"
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al eliminar producto"
+            detail=detail
         )

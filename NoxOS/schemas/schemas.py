@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
@@ -12,15 +12,7 @@ class UsuarioBase(BaseModel):
     activo: bool = True
 
 class UsuarioCreate(UsuarioBase):
-    password: str = Field(..., min_length=8, max_length=100)
-    
-    @validator('password')
-    def password_strength(cls, v):
-        if not any(c.isupper() for c in v):
-            raise ValueError('La contraseña debe tener al menos una mayúscula')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('La contraseña debe tener al menos un número')
-        return v
+    password: str = Field(..., min_length=4, max_length=100)
 
 class UsuarioUpdate(BaseModel):
     nombre: Optional[str] = Field(None, min_length=3, max_length=100)
@@ -178,6 +170,10 @@ class MovimientoInventarioCreate(BaseModel):
     cantidad: int
     motivo: Optional[str] = Field(None, max_length=255)
 
+class MovimientoInventarioUpdate(BaseModel):
+    motivo: Optional[str] = Field(None, max_length=255)
+    cantidad: Optional[int] = Field(None, gt=0)
+
 class MovimientoInventarioResponse(MovimientoInventarioCreate):
     id: int
     fecha: datetime
@@ -195,6 +191,11 @@ class FacturaCreate(BaseModel):
     numero: str = Field(..., min_length=1, max_length=50)
     tipo_id: int
     total: Decimal = Field(..., ge=0, max_digits=10, decimal_places=2)
+
+class FacturaUpdate(BaseModel):
+    numero: Optional[str] = Field(None, min_length=1, max_length=50)
+    tipo_id: Optional[int] = None
+    total: Optional[Decimal] = Field(None, ge=0, max_digits=10, decimal_places=2)
 
 class FacturaResponse(FacturaCreate):
     id: int
@@ -237,13 +238,4 @@ class TipoFacturaResponse(BaseModel):
 
 
 
-# Schemas: Autenticación
 
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    expires_in: int
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
