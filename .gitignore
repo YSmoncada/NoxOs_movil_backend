@@ -1,50 +1,29 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Virtual environments
-venv/
-env/
-ENV/
+# Virtual environment
 Lib/
 Scripts/
 pyvenv.cfg
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
 *.egg-info/
 dist/
 build/
 
-# Environment variables
+# Environment
 .env
 .env.local
-.env.*.local
 
 # IDE
 .vscode/
 .idea/
 *.swp
-*.swo
-*~
-.DS_Store
 
-# Database
-*.db
-*.sqlite3
-database/*.db
-
-# Logs and cache
-logs/
+# Logs
 *.log
-CACHEDIR.TAG
+logs/
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Test results
-test_results.txt
+# Cache
 .pytest_cache/
-
-# pip
-pip-log.txt
-pip-delete-this-directory.txt
+CACHEDIR.TAG
