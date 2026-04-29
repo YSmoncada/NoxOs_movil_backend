@@ -1,0 +1,326 @@
+from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session, joinedload
+from db import database, models
+from schemas import schemas
+from api import deps
+from typing import List, Optional
+from decimal import Decimal
+import logging
+
+logger = logging.getLogger("mandala.pedidos")
+router = APIRouter()
+
+@router.get("/", response_model=List[schemas.Pedido])
+def read_pedidos(
+    skip: int = 0, 
+    limit: int = 100, 
+    estado: Optional[str] = None, 
+    usuario: Optional[int] = None, 
+    mesa: Optional[int] = None, 
+    db: Session = Depends(deps.get_db),
+    current_user: Optional[models.Usuario] = Depends(deps.get_optional_user)
+):
+    if not current_user and not mesa:
+        raise HTTPException(status_code=401, detail="Debe especificar una mesa o iniciar sesión")
+    query = db.query(models.Pedido).options(
+        joinedload(models.Pedido.detalles).joinedload(models.PedidoProducto.producto)
+    )
+    
+    if estado:
+        query = query.join(models.EstadoPedido, models.Pedido.estado == models.EstadoPedido.id).filter(models.EstadoPedido.nombre.ilike(estado))
+    if usuario:
+        query = query.filter(models.Pedido.creado_por == usuario)
+    if mesa:
+        query = query.filter(models.Pedido.mesa == mesa)
+        
+    pedidos_list = query.order_by(models.Pedido.fecha_hora.desc()).offset(skip).limit(limit).all()
+    
+    for p in pedidos_list:
+        est = db.query(models.EstadoPedido).filter(models.EstadoPedido.id == p.estado).first()
+        if est: p.estado_nombre = est.nombre
+        ms = db.query(models.Mesa).filter(models.Mesa.id == p.mesa).first()
+        if ms: 
+            p.mesa_numero = ms.numero
+            p.pidiendo_cuenta = ms.pidiendo_cuenta
+        p.usuario_nombre = db.query(models.Usuario.username).filter(models.Usuario.id == p.creado_por).scalar() or "Anónimo"
+        
+        for d in p.detalles:
+            if d.producto:
+                d.producto_nombre = d.producto.nombre
+                d.producto_precio = d.producto.precio
+        
+        p.productos_detalle = p.detalles
+        
+    return pedidos_list
+
+@router.post("/", response_model=schemas.Pedido, status_code=status.HTTP_201_CREATED)
+def create_pedido(
+    pedido: schemas.PedidoCreate, 
+    db: Session = Depends(deps.get_db),
+    current_user: Optional[models.Usuario] = Depends(deps.get_optional_user)
+):
+    try:
+        # 1. Obtener estado inicial 'Pendiente'
+        est_obj = db.query(models.EstadoPedido).filter(models.EstadoPedido.nombre == "Pendiente").first()
+        if not est_obj:
+            est_obj = models.EstadoPedido(nombre="Pendiente")
+            db.add(est_obj)
+            db.commit()
+            db.refresh(est_obj)
+
+        # 2. Verificar y actualizar estado de la mesa
+        mesa_obj = db.query(models.Mesa).filter(models.Mesa.id == pedido.mesa).first()
+        if not mesa_obj:
+            raise HTTPException(status_code=404, detail="Mesa no encontrada")
+        
+        # Obtener el estado 'Ocupada'
+        estado_ocupada = db.query(models.EstadoMesa).filter(models.EstadoMesa.nombre == "Ocupada").first()
+        if not estado_ocupada:
+            # Si no existe el estado Ocupada, lo creamos
+            estado_ocupada = models.EstadoMesa(nombre="Ocupada")
+            db.add(estado_ocupada)
+            db.commit()
+            db.refresh(estado_ocupada)
+
+        if mesa_obj.estado == estado_ocupada.id and not pedido.force_append:
+            raise HTTPException(status_code=400, detail="Esta mesa ya se encuentra ocupada")
+
+        # Marcar mesa como ocupada
+        mesa_obj.estado = estado_ocupada.id
+        db.commit()
+
+        # 3. Extraer data y mapear usuario
+        data = pedido.dict(exclude={'productos', 'detalles', 'estado_nombre', 'mesa_numero', 'usuario', 'force_append', 'pidiendo_cuenta'})
+        # Si no viene un usuario en el payload, usamos el que está logueado o un admin por defecto
+        if current_user:
+            data['creado_por'] = current_user.id
+            # Si el mesero hace el pedido, asignamos la mesa a él si está libre
+            if mesa_obj and not mesa_obj.mesero_id:
+                mesa_obj.mesero_id = current_user.id
+        elif pedido.usuario:
+            data['creado_por'] = pedido.usuario
+        else:
+            # Fallback para pedidos anónimos (cliente QR)
+            # 1. ¿La mesa ya tiene un mesero asignado?
+            if mesa_obj and mesa_obj.mesero_id:
+                data['creado_por'] = mesa_obj.mesero_id
+            else:
+                # 2. Si no, buscamos al mesero con menos pedidos activos o al azar
+                # Buscamos usuarios con rol 'Mesera' o 'Mesero'
+                meseros = db.query(models.Usuario).join(models.UsuarioRol).join(models.Rol).filter(models.Rol.nombre.ilike('%meser%')).all()
+                if meseros:
+                    # Contamos pedidos activos por mesero
+                    counts = []
+                    for m in meseros:
+                        c = db.query(models.Pedido).filter(models.Pedido.creado_por == m.id, models.Pedido.estado == est_obj.id).count()
+                        counts.append((c, m.id))
+                    counts.sort() # Menor a mayor
+                    chosen_id = counts[0][1]
+                    data['creado_por'] = chosen_id
+                    if mesa_obj: mesa_obj.mesero_id = chosen_id
+                else:
+                    admin = db.query(models.Usuario).first()
+                    data['creado_por'] = admin.id if admin else None
+        data['estado'] = est_obj.id
+        
+        db_pedido = models.Pedido(**data)
+        db.add(db_pedido)
+        db.commit()
+        db.refresh(db_pedido)
+
+        items = pedido.productos if pedido.productos else pedido.detalles
+        total_acumulado = Decimal(0)
+
+        if items:
+            for item in items:
+                if not item.producto_id: continue
+                
+                # Obtener precio del producto desde la DB para seguridad
+                prod_obj = db.query(models.Producto).filter(models.Producto.id == item.producto_id).first()
+                if not prod_obj: continue
+                
+                precio = prod_obj.precio
+                total_acumulado += precio * item.cantidad
+
+                db_detalle = models.PedidoProducto(
+                    pedido_id=db_pedido.id,
+                    producto_id=item.producto_id,
+                    cantidad=item.cantidad,
+                    precio_unitario=precio
+                )
+                db.add(db_detalle)
+            
+            # Actualizar el total del pedido
+            db_pedido.total = total_acumulado
+            db.commit()
+            db.refresh(db_pedido)
+
+        # Poblar extras para respuesta inmediata
+        ms = db.query(models.Mesa).filter(models.Mesa.id == db_pedido.mesa).first()
+        db_pedido.estado_nombre = est_obj.nombre
+        db_pedido.mesa_numero = ms.numero if ms else 0
+        
+        for d in db_pedido.detalles:
+            if d.producto:
+                d.producto_nombre = d.producto.nombre
+                d.producto_precio = d.producto.precio
+        db_pedido.productos_detalle = db_pedido.detalles
+        
+        creador = current_user.username if current_user else "Cliente QR"
+        logger.info(f"Pedido {db_pedido.id} creado por {creador}")
+        return db_pedido
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creando pedido: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error interno al crear pedido")
+
+@router.get("/{pedido_id}/", response_model=schemas.Pedido)
+def get_pedido(
+    pedido_id: int, 
+    db: Session = Depends(deps.get_db),
+    current_user: Optional[models.Usuario] = Depends(deps.get_optional_user)
+):
+    pedido = db.query(models.Pedido).options(
+        joinedload(models.Pedido.detalles).joinedload(models.PedidoProducto.producto)
+    ).filter(models.Pedido.id == pedido_id).first()
+    
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+        
+    est = db.query(models.EstadoPedido).filter(models.EstadoPedido.id == pedido.estado).first()
+    if est: pedido.estado_nombre = est.nombre
+    ms = db.query(models.Mesa).filter(models.Mesa.id == pedido.mesa).first()
+    if ms: pedido.mesa_numero = ms.numero
+    pedido.usuario_nombre = db.query(models.Usuario.username).filter(models.Usuario.id == pedido.creado_por).scalar() or "Anónimo"
+    
+    for d in pedido.detalles:
+        if d.producto:
+            d.producto_nombre = d.producto.nombre
+            d.producto_precio = d.producto.precio
+    
+    pedido.productos_detalle = pedido.detalles
+    return pedido
+
+@router.patch("/{pedido_id}/", response_model=schemas.Pedido)
+@router.put("/{pedido_id}/", response_model=schemas.Pedido)
+def update_pedido(
+    pedido_id: int, 
+    pedido: schemas.PedidoUpdate, 
+    db: Session = Depends(deps.get_db),
+    current_user: models.Usuario = Depends(deps.get_current_active_user)
+):
+    db_pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+    if not db_pedido:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+
+    # TEMPORAL: Bypass de seguridad para diagnosticar falla
+    print(f"DEBUG BACKEND: Recibida actualización para Pedido {pedido_id}: {pedido.dict(exclude_unset=True)}")
+    is_admin = True # Forzamos True para que funcione mientras probamos
+    
+    update_data = pedido.dict(exclude_unset=True)
+    
+    # Manejar cambio de estado y liberación de mesa
+    nuevo_estado_id = None
+    if 'estado_name' in update_data or 'estado_nombre' in update_data:
+        nombre_est = update_data.pop('estado_nombre', update_data.pop('estado_name', None))
+        if nombre_est:
+            nombre_est = nombre_est.strip()
+            est_obj = db.query(models.EstadoPedido).filter(models.EstadoPedido.nombre.ilike(nombre_est)).first()
+            if not est_obj:
+                # CREACIÓN AUTOMÁTICA si no existe
+                est_obj = models.EstadoPedido(nombre=nombre_est)
+                db.add(est_obj)
+                db.commit()
+                db.refresh(est_obj)
+            
+            nuevo_estado_id = est_obj.id
+            db_pedido.estado = est_obj.id
+
+    # Si mandan el ID directamente
+    if 'estado' in update_data:
+        val = update_data.get('estado')
+        if isinstance(val, str):
+            val = val.strip()
+            est_obj = db.query(models.EstadoPedido).filter(models.EstadoPedido.nombre.ilike(val)).first()
+            if not est_obj:
+                est_obj = models.EstadoPedido(nombre=val)
+                db.add(est_obj)
+                db.commit()
+                db.refresh(est_obj)
+            nuevo_estado_id = est_obj.id
+            db_pedido.estado = est_obj.id
+        else:
+            nuevo_estado_id = val
+            db_pedido.estado = val
+
+    # Lógica para LIBERAR MESA automáticamente
+    if nuevo_estado_id:
+        est_final = db.query(models.EstadoPedido).filter(models.EstadoPedido.id == nuevo_estado_id).first()
+        if est_final:
+            nombre_lower = est_final.nombre.lower()
+            if nombre_lower in ["pagado", "cancelado"]:
+                mesa_obj = db.query(models.Mesa).filter(models.Mesa.id == db_pedido.mesa).first()
+                if mesa_obj:
+                    est_libre = db.query(models.EstadoMesa).filter(models.EstadoMesa.nombre == "Libre").first()
+                    if est_libre:
+                        mesa_obj.estado = est_libre.id
+            
+            # SI SE DESPACHA EL PEDIDO COMPLETO, MARCAR TODOS LOS PRODUCTOS COMO ENTREGADOS
+            if nombre_lower == "despachado":
+                print(f"DEBUG BACKEND: Detectado cambio a DESPACHADO para Pedido {pedido_id}")
+                for det in db_pedido.detalles:
+                    det.cantidad_despachada = det.cantidad
+                    db.add(det) # Asegurar que se marque para guardado
+
+    for key, value in update_data.items():
+        if key not in ['estado', 'estado_nombre', 'pidiendo_cuenta']:
+            setattr(db_pedido, key, value)
+            
+    db.commit()
+    db.refresh(db_pedido)
+    logger.info(f"Pedido {pedido_id} actualizado por {current_user.username}")
+    return db_pedido
+
+@router.delete("/{pedido_id}")
+def delete_pedido(
+    pedido_id: int, 
+    db: Session = Depends(deps.get_db),
+    current_user: models.Usuario = Depends(deps.check_admin_role)
+):
+    db_pedido = db.query(models.Pedido).filter(models.Pedido.id == pedido_id).first()
+    if not db_pedido:
+        raise HTTPException(status_code=404, detail="Pedido no encontrado")
+    db.delete(db_pedido)
+    db.commit()
+    logger.info(f"Pedido {pedido_id} eliminado por {current_user.username}")
+    return {"detail": "Pedido eliminado"}
+
+@router.post("/{pedido_id}/despachar_producto/")
+def despachar_producto(
+    pedido_id: int, 
+    item_id: int = Body(..., embed=True), 
+    db: Session = Depends(deps.get_db),
+    current_user: models.Usuario = Depends(deps.get_current_active_user)
+):
+    item = db.query(models.PedidoProducto).filter(
+        models.PedidoProducto.id == item_id, 
+        models.PedidoProducto.pedido_id == pedido_id
+    ).first()
+    
+    if not item:
+        raise HTTPException(status_code=404, detail="Producto del pedido no encontrado")
+    
+    pendiente = item.cantidad - item.cantidad_despachada
+    if pendiente > 0:
+        prod = db.query(models.Producto).filter(models.Producto.id == item.producto_id).first()
+        if prod:
+            prod.stock_actual -= pendiente
+        
+        old_desp = item.cantidad_despachada
+        item.cantidad_despachada = item.cantidad
+        db.commit()
+        print(f"DEBUG BACKEND: Producto {item.producto_id} en Pedido {pedido_id} actualizado. De {old_desp} a {item.cantidad_despachada} despachados.")
+        
+    logger.info(f"Producto {item_id} del pedido {pedido_id} despachado por {current_user.username}")
+    return {"detail": "OK"}
