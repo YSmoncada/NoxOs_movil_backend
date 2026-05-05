@@ -32,7 +32,7 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
         raise credentials_exception
     
     # Optional: check if token expired
-    if session.expires_at and session.expires_at < datetime.utcnow():
+    if session.expires_at and session.expires_at < datetime.now(timezone.utc):
         raise credentials_exception
     
     user = session.user
@@ -46,10 +46,12 @@ def get_optional_user(db: Session = Depends(get_db), token: Optional[str] = Depe
         return None
     try:
         session = db.query(models.UserSession).filter(models.UserSession.token == token).first()
-        if not session or (session.expires_at and session.expires_at < datetime.utcnow()):
+        # Usar timezone-aware datetime para comparar con expires_at que también es timezone-aware
+        if not session or (session.expires_at and session.expires_at < datetime.now(timezone.utc)):
             return None
         return session.user
-    except:
+    except Exception as e:
+        logger.error(f"Error en get_optional_user: {str(e)}")
         return None
 
 def get_current_active_user(current_user: models.Usuario = Depends(get_current_user)):
