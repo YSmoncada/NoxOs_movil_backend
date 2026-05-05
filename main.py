@@ -93,7 +93,8 @@ app.include_router(config.router, prefix="/api/config", tags=["config"])
 
 @app.get("/")
 def read_root():
-    return {"message": "Mandala FastAPI Backend - Version 2.0.2 (CORS + Bcrypt Fix)"}
+    return {"message": "Mandala FastAPI Backend - Version 2.0.3 (Full Traceback)"}
+
 
 
 
