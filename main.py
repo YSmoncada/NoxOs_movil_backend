@@ -47,8 +47,9 @@ async def db_diagnostic_middleware(request: Request, call_next):
         logger.error(error_msg)
         return JSONResponse(
             status_code=500,
-            content={"detail": f"Error interno: {str(e)}", "traceback": error_msg[:200]}
+            content={"detail": f"Error interno: {str(e)}", "traceback": error_msg}
         )
+
 
 # Configurar CORS
 
