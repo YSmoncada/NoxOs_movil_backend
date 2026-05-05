@@ -14,8 +14,14 @@ router = APIRouter()
 @router.post("/login/", response_model=schemas.Token)
 def login(login_data: schemas.UserCreate, db: Session = Depends(deps.get_db)):
     user = db.query(models.Usuario).filter(models.Usuario.username == login_data.username).first()
-    if not user or not security.verify_password(login_data.password, user.password):
+    
+    # bcrypt tiene un límite de 72 bytes para el texto plano de la contraseña.
+    # Truncamos manualmente para evitar errores de la librería.
+    plain_password = login_data.password[:72] if login_data.password else ""
+    
+    if not user or not security.verify_password(plain_password, user.password):
         logger.warning(f"Intento de login fallido para: {login_data.username}")
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario o contraseña incorrectos",
