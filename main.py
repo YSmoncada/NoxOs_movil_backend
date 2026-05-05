@@ -1,10 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from db.database import engine, Base
 from api.endpoints import auth, pedidos, inventario, mesas, usuarios, config
 from fastapi.staticfiles import StaticFiles
 import os
 import logging
+from db import models # Asegurar que todos los modelos se carguen
 
 # Configurar logging solo a consola para evitar bucles de reinicio
 logging.basicConfig(
@@ -13,6 +15,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger("mandala")
+
 
 # Crear tablas y semillar si es necesario
 Base.metadata.create_all(bind=engine)
@@ -33,14 +36,37 @@ finally:
 
 app = FastAPI(title="Mandala API (FastAPI)")
 
+# Middleware de diagnóstico para ver errores reales en Render
+@app.middleware("http")
+async def db_diagnostic_middleware(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as e:
+        import traceback
+        error_msg = f"ERROR NO CONTROLADO: {str(e)}\n{traceback.format_exc()}"
+        logger.error(error_msg)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Error interno: {str(e)}", "traceback": error_msg[:200]}
+        )
+
 # Configurar CORS
+
+origins = [
+    "http://localhost:8081",
+    "http://localhost:8082",
+    "https://mandala-proyect.vercel.app",
+    "https://mandala-nuevo.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Montar archivos estáticos para las imágenes (Ruta Relativa)
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -65,7 +91,8 @@ app.include_router(config.router, prefix="/api/config", tags=["config"])
 
 @app.get("/")
 def read_root():
-    return {"message": "Mandala FastAPI Backend System - Operational"}
+    return {"message": "Mandala FastAPI Backend - Version 2.0.1 (Fresh DB Ready)"}
+
 
 if __name__ == "__main__":
     import uvicorn

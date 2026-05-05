@@ -4,7 +4,8 @@ from sqlalchemy.orm import sessionmaker
 import os
 
 # Por defecto usamos SQLite para desarrollo, pero se puede cambiar a MySQL/PostgreSQL
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./mandala.db")
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./mandala_v2.db")
+
 
 # Corregir URL de Render/Heroku (postgres:// -> postgresql://)
 if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):

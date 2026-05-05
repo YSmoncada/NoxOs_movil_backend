@@ -35,22 +35,31 @@ def login(login_data: schemas.UserCreate, db: Session = Depends(deps.get_db)):
     # Generar Opaque Token y guardarlo en DB
     logger.info(f"Generando token para {user.username}...")
     token_str = security.create_opaque_token()
-    expires = datetime.utcnow() + timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    # Usar datetime con zona horaria UTC explícita para evitar problemas con SQLAlchemy/SQLite
+    now = datetime.now(timezone.utc)
+    expires = now + timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
     
     try:
-        logger.info("Guardando sesión en DB...")
+        logger.info(f"Intentando guardar sesión para usuario {user.id}...")
         new_session = models.UserSession(
             token=token_str,
             user_id=user.id,
-            expires_at=expires
+            expires_at=expires,
+            created_at=now
         )
         db.add(new_session)
         db.commit()
-        logger.info("Sesión guardada exitosamente.")
+        logger.info("Sesión guardada exitosamente en la base de datos.")
     except Exception as e:
         db.rollback()
-        logger.error(f"Error al guardar sesión: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error interno al crear sesión")
+        logger.error(f"ERROR CRÍTICO AL GUARDAR SESIÓN: {str(e)}")
+        # Devolvemos el error detallado temporalmente para diagnosticar en Render
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error en base de datos: {str(e)}"
+        )
+
 
     logger.info(f"Login exitoso: {user.username} (Rol: {role})")
     return {
