@@ -116,14 +116,27 @@ def delete_producto(
     db: Session = Depends(deps.get_db),
     current_user: models.Usuario = Depends(deps.check_admin_role)
 ):
+    from sqlalchemy.exc import IntegrityError
+    
     db_prod = db.query(models.Producto).filter(models.Producto.id == producto_id).first()
     if not db_prod:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
+    
     nombre = db_prod.nombre
-    db.delete(db_prod)
-    db.commit()
-    logger.info(f"Producto {nombre} eliminado por {current_user.username}")
-    return {"detail": "Producto eliminado"}
+    try:
+        # Intentar borrado físico
+        db.delete(db_prod)
+        db.commit()
+        logger.info(f"Producto {nombre} eliminado físicamente por {current_user.username}")
+        return {"detail": "Producto eliminado permanentemente"}
+    except IntegrityError:
+        # Si tiene dependencias (pedidos), hacemos borrado lógico (desactivar)
+        db.rollback()
+        db_prod.activo = False
+        db.commit()
+        logger.info(f"Producto {nombre} desactivado (borrado lógico) por tener historial de ventas")
+        return {"detail": "Producto desactivado por tener registros asociados"}
+
 
 # --- MOVIMIENTOS ---
 
