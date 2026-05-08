@@ -266,12 +266,36 @@ def update_pedido(
                     if est_libre:
                         mesa_obj.estado = est_libre.id
             
-            # SI SE DESPACHA EL PEDIDO COMPLETO, MARCAR TODOS LOS PRODUCTOS COMO ENTREGADOS
-            if nombre_lower == "despachado":
-                print(f"DEBUG BACKEND: Detectado cambio a DESPACHADO para Pedido {pedido_id}")
+            # SI SE DESPACHA EL PEDIDO COMPLETO, MARCAR TODOS LOS PRODUCTOS COMO ENTREGADOS Y DESCONTAR STOCK
+            if nombre_lower == "despachado" or nombre_lower == "aceptado":
+                print(f"DEBUG BACKEND: Detectado cambio a {nombre_lower.upper()} para Pedido {pedido_id}. Descontando stock...")
+                
+                # Obtener el ID del tipo de movimiento "Venta"
+                tipo_venta = db.query(models.TipoMovimiento).filter(models.TipoMovimiento.nombre.ilike("Venta")).first()
+                tipo_venta_id = tipo_venta.id if tipo_venta else None
+
                 for det in db_pedido.detalles:
+                    # Solo descontar lo que no se ha despachado todavía para evitar descuentos duplicados
+                    pendiente = det.cantidad - det.cantidad_despachada
+                    if pendiente > 0:
+                        prod = db.query(models.Producto).filter(models.Producto.id == det.producto_id).first()
+                        if prod:
+                            prod.stock_actual -= pendiente
+                            
+                            # Registrar el movimiento en el historial de inventario
+                            if tipo_venta_id:
+                                nuevo_mov = models.MovimientoInventario(
+                                    producto_id=prod.id,
+                                    tipo_id=tipo_venta_id,
+                                    cantidad=pendiente,
+                                    motivo=f"Venta Pedido #{pedido_id}",
+                                    usuario_id=current_user.id
+                                )
+                                db.add(nuevo_mov)
+                    
                     det.cantidad_despachada = det.cantidad
-                    db.add(det) # Asegurar que se marque para guardado
+                    db.add(det)
+
 
     for key, value in update_data.items():
         if key not in ['estado', 'estado_nombre', 'pidiendo_cuenta']:
