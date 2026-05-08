@@ -65,9 +65,10 @@ def get_productos(
     categoria: Optional[int] = None, 
     db: Session = Depends(deps.get_db)
 ):
-    query = db.query(models.Producto)
+    query = db.query(models.Producto).filter(models.Producto.activo == True)
     if categoria:
         query = query.filter(models.Producto.categoria == categoria)
+
     
     productos_list = query.all()
     for p in productos_list:
