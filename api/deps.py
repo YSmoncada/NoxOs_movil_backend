@@ -18,6 +18,16 @@ def get_db():
     finally:
         db.close()
 
+def _is_expired(expires_at):
+    """Compara expires_at sin importar si es naive o aware."""
+    if not expires_at:
+        return False
+    now = datetime.utcnow()
+    # Si viene con timezone (aware), le quitamos la zona para poder comparar
+    if expires_at.tzinfo is not None:
+        expires_at = expires_at.replace(tzinfo=None)
+    return expires_at < now
+
 def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -31,8 +41,7 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
     if not session:
         raise credentials_exception
     
-    # Optional: check if token expired
-    if session.expires_at and session.expires_at < datetime.now(timezone.utc):
+    if _is_expired(session.expires_at):
         raise credentials_exception
     
     user = session.user
@@ -46,8 +55,7 @@ def get_optional_user(db: Session = Depends(get_db), token: Optional[str] = Depe
         return None
     try:
         session = db.query(models.UserSession).filter(models.UserSession.token == token).first()
-        # Usar timezone-aware datetime para comparar con expires_at que también es timezone-aware
-        if not session or (session.expires_at and session.expires_at < datetime.now(timezone.utc)):
+        if not session or _is_expired(session.expires_at):
             return None
         return session.user
     except Exception as e:
