@@ -10,7 +10,7 @@ from sqlalchemy.sql import func
 
 router = APIRouter()
 
-@router.get("/turno/actual/", response_model=Optional[schemas.Turno])
+@router.get("/turno/actual/")
 def get_turno_actual(db: Session = Depends(get_db)):
     turno = db.query(models.Turno).filter(models.Turno.estado == "abierto").first()
     if not turno:

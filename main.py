@@ -98,7 +98,7 @@ app.include_router(contabilidad.router, prefix="/api/contabilidad", tags=["conta
 
 @app.get("/")
 def read_root():
-    return {"message": "Mandala FastAPI Backend - Version 2.2.2 (Data Robustness & Mesa Fix)"}
+    return {"message": "Mandala FastAPI Backend - Version 2.2.3 (Validation Relaxed & Orders Fix)"}
 
 
 

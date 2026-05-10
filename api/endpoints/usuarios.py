@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger("mandala.usuarios")
 router = APIRouter()
 
-@router.get("/", response_model=List[schemas.User])
+@router.get("/")
 def get_usuarios(
     db: Session = Depends(deps.get_db), 
     current_user: models.Usuario = Depends(deps.check_admin_role)
