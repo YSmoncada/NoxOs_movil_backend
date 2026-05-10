@@ -91,9 +91,9 @@ for mp in possible_media_paths:
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(pedidos.router, prefix="/api/pedidos", tags=["pedidos"])
 app.include_router(inventario.router, prefix="/api", tags=["inventario"])
-app.include_router(mesas.router, prefix="/api", tags=["mesas"])
+app.include_router(mesas.router, prefix="/api/mesas", tags=["mesas"])
 app.include_router(usuarios.router, prefix="/api/usuarios", tags=["usuarios"])
-app.include_router(config.router, prefix="/api", tags=["config"])
+app.include_router(config.router, prefix="/api/config", tags=["config"])
 app.include_router(contabilidad.router, prefix="/api/contabilidad", tags=["contabilidad"])
 
 @app.get("/")
