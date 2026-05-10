@@ -16,13 +16,21 @@ def get_usuarios(
     current_user: models.Usuario = Depends(deps.check_admin_role)
 ):
     users = db.query(models.Usuario).options(joinedload(models.Usuario.roles_asignados)).all()
+    results = []
     for user in users:
-        user.user_role = "usuario"
+        # Convertir a dict para manipular o usar el objeto directamente
+        # Pydantic con from_attributes=True leerá las propiedades que añadamos
+        role_name = "usuario"
         if user.roles_asignados:
-            rol = db.query(models.Rol).filter(models.Rol.id == user.roles_asignados[0].rol_id).first()
-            if rol:
-                user.user_role = rol.nombre
-    return users
+            rol_rel = db.query(models.Rol).filter(models.Rol.id == user.roles_asignados[0].rol_id).first()
+            if rol_rel:
+                role_name = rol_rel.nombre
+        
+        # Añadir el atributo dinámico que el esquema espera
+        user.user_role = role_name
+        results.append(user)
+        
+    return results
 
 @router.post("/", response_model=schemas.User)
 def create_usuario(
