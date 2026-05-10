@@ -68,6 +68,11 @@ def create_pedido(
             db.add(est_obj)
             db.commit()
             db.refresh(est_obj)
+        
+        # --- VALIDACIÓN DE TURNO ---
+        turno_actual = db.query(models.Turno).filter(models.Turno.estado == "abierto").first()
+        if not turno_actual:
+            raise HTTPException(status_code=400, detail="VENTAS BLOQUEADAS: No hay un turno abierto en caja.")
 
         # 2. Verificar y actualizar estado de la mesa
         mesa_obj = db.query(models.Mesa).filter(models.Mesa.id == pedido.mesa).first()
@@ -123,6 +128,7 @@ def create_pedido(
                     admin = db.query(models.Usuario).first()
                     data['creado_por'] = admin.id if admin else None
         data['estado'] = est_obj.id
+        data['turno_id'] = turno_actual.id
         
         db_pedido = models.Pedido(**data)
         db.add(db_pedido)

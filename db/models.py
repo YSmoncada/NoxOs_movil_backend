@@ -80,10 +80,12 @@ class Pedido(Base):
     total = Column(Numeric(12, 2), default=0)
     mesa = Column(Integer, ForeignKey("mesas.id"))
     creado_por = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    turno_id = Column(Integer, ForeignKey("turnos.id"), nullable=True)
 
     rel_estado = relationship("EstadoPedido")
     rel_mesa = relationship("Mesa")
     detalles = relationship("PedidoProducto", back_populates="pedido")
+    turno = relationship("Turno")
 
 class PedidoProducto(Base):
     __tablename__ = "pedido_productos"
@@ -122,6 +124,40 @@ class EmpresaConfig(Base):
     mensaje_footer = Column(Text, default="¡Gracias por su visita!")
     moneda = Column(String(10), default="$")
     impuesto_porcentaje = Column(Numeric(5, 2), default=0)
+
+class TokenBlacklist(Base):
+    __tablename__ = "token_blacklist"
+    id = Column(Integer, primary_key=True, index=True)
+    token = Column(String(255), unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("usuarios.id"))
+    expires_at = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("Usuario")
+
+class Turno(Base):
+    __tablename__ = "turnos"
+    id = Column(Integer, primary_key=True, index=True)
+    abierto_por = Column(Integer, ForeignKey("usuarios.id"))
+    cerrado_por = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    fecha_apertura = Column(DateTime(timezone=True), server_default=func.now())
+    fecha_cierre = Column(DateTime(timezone=True), nullable=True)
+    base_inicial = Column(Numeric(12, 2), default=0)
+    total_ventas = Column(Numeric(12, 2), default=0)
+    efectivo_real = Column(Numeric(12, 2), nullable=True)
+    estado = Column(String(20), default="abierto") # abierto, cerrado
+    observaciones = Column(Text, nullable=True)
+
+    usuario_apertura = relationship("Usuario", foreign_keys=[abierto_por])
+    usuario_cierre = relationship("Usuario", foreign_keys=[cerrado_por])
+
+    @property
+    def usuario_apertura_nombre(self):
+        return self.usuario_apertura.username if self.usuario_apertura else None
+
+    @property
+    def usuario_cierre_nombre(self):
+        return self.usuario_cierre.username if self.usuario_cierre else None
 
 class UserSession(Base):
     __tablename__ = "user_sessions"

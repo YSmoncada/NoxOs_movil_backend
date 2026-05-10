@@ -225,3 +225,29 @@ class MovimientoInventario(MovimientoInventarioBase):
     usuario_nombre: Optional[str] = None
     class Config:
         from_attributes = True
+
+# Turno schemas
+class TurnoBase(BaseModel):
+    base_inicial: Decimal = Decimal(0)
+    observaciones: Optional[str] = None
+
+class TurnoCreate(TurnoBase):
+    abierto_por: Optional[int] = None
+
+class TurnoCierre(BaseModel):
+    efectivo_real: Decimal
+    observaciones: Optional[str] = None
+
+class Turno(TurnoBase):
+    id: int
+    abierto_por: int
+    cerrado_por: Optional[int] = None
+    fecha_apertura: datetime
+    fecha_cierre: Optional[datetime] = None
+    total_ventas: Decimal
+    efectivo_real: Optional[Decimal] = None
+    estado: str
+    usuario_apertura_nombre: Optional[str] = None
+    usuario_cierre_nombre: Optional[str] = None
+    class Config:
+        from_attributes = True
