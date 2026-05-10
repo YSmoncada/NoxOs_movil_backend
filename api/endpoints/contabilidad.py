@@ -26,7 +26,7 @@ def get_turno_actual(db: Session = Depends(get_db)):
     turno.total_ventas = total_ventas
     return turno
 
-@router.post("/turno/abrir/", response_model=schemas.Turno)
+@router.post("/turno/abrir/")
 def abrir_turno(
     turno_in: schemas.TurnoCreate, 
     db: Session = Depends(get_db),
@@ -48,7 +48,7 @@ def abrir_turno(
     db.refresh(db_turno)
     return db_turno
 
-@router.post("/turno/cerrar/", response_model=schemas.Turno)
+@router.post("/turno/cerrar/")
 def cerrar_turno(
     cierre: schemas.TurnoCierre,
     db: Session = Depends(get_db),
@@ -75,7 +75,7 @@ def cerrar_turno(
     db.refresh(turno)
     return turno
 
-@router.get("/turnos/historial/", response_model=List[schemas.Turno])
+@router.get("/turnos/historial/")
 def get_historial_turnos(
     skip: int = 0, 
     limit: int = 50, 

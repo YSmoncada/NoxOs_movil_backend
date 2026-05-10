@@ -47,7 +47,7 @@ def assign_waiter(db: Session, mesa: models.Mesa):
     print(f"DEBUG: Mesa {mesa.numero} ASIGNADA a mesero {selected.username} (ID: {selected.id})")
     return selected
 
-@router.get("/", response_model=List[schemas.Mesa])
+@router.get("/")
 def get_mesas(
     db: Session = Depends(deps.get_db),
     current_user: models.Usuario = Depends(deps.get_current_active_user)
@@ -61,7 +61,7 @@ def get_mesas(
             m.mesero_nombre = m.rel_mesero.nombre_completo or m.rel_mesero.username
     return mesas_list
 
-@router.get("/{mesa_id}/", response_model=schemas.Mesa)
+@router.get("/{mesa_id}/")
 def get_mesa(
     mesa_id: int, 
     db: Session = Depends(deps.get_db)
@@ -109,7 +109,7 @@ def limpiar_cuenta(
     db.commit()
     return {"detail": "Alerta de cuenta limpiada"}
 
-@router.post("/", response_model=schemas.Mesa)
+@router.post("/")
 def create_mesa(
     mesa: schemas.MesaBase, 
     db: Session = Depends(deps.get_db),
@@ -130,8 +130,8 @@ def create_mesa(
     logger.info(f"Mesa {db_mesa.numero} creada por {current_user.username}")
     return db_mesa
 
-@router.patch("/{mesa_id}/", response_model=schemas.Mesa)
-@router.put("/{mesa_id}/", response_model=schemas.Mesa)
+@router.patch("/{mesa_id}/")
+@router.put("/{mesa_id}/")
 def update_mesa(
     mesa_id: int, 
     mesa: schemas.MesaUpdate, 
@@ -166,7 +166,7 @@ def delete_mesa(
     logger.info(f"Mesa {numero} eliminada por {current_user.username}")
     return {"detail": "Mesa eliminada"}
 
-@router.get("/estados/", response_model=List[schemas.Estado])
+@router.get("/estados/")
 def get_estados_mesa(
     db: Session = Depends(deps.get_db),
     current_user: models.Usuario = Depends(deps.get_current_active_user)

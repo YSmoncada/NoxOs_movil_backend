@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger("mandala.pedidos")
 router = APIRouter()
 
-@router.get("/", response_model=List[schemas.Pedido])
+@router.get("/")
 def read_pedidos(
     skip: int = 0, 
     limit: int = 100, 
@@ -54,7 +54,7 @@ def read_pedidos(
         
     return pedidos_list
 
-@router.post("/", response_model=schemas.Pedido, status_code=status.HTTP_201_CREATED)
+@router.post("/", status_code=status.HTTP_201_CREATED)
 def create_pedido(
     pedido: schemas.PedidoCreate, 
     db: Session = Depends(deps.get_db),
@@ -181,7 +181,7 @@ def create_pedido(
         logger.error(f"Error creando pedido: {str(e)}")
         raise HTTPException(status_code=500, detail="Error interno al crear pedido")
 
-@router.get("/{pedido_id}/", response_model=schemas.Pedido)
+@router.get("/{pedido_id}/")
 def get_pedido(
     pedido_id: int, 
     db: Session = Depends(deps.get_db),
@@ -208,8 +208,8 @@ def get_pedido(
     pedido.productos_detalle = pedido.detalles
     return pedido
 
-@router.patch("/{pedido_id}/", response_model=schemas.Pedido)
-@router.put("/{pedido_id}/", response_model=schemas.Pedido)
+@router.patch("/{pedido_id}/")
+@router.put("/{pedido_id}/")
 def update_pedido(
     pedido_id: int, 
     pedido: schemas.PedidoUpdate, 
