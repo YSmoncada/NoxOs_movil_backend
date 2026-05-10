@@ -242,9 +242,9 @@ class Turno(TurnoBase):
     id: int
     abierto_por: int
     cerrado_por: Optional[int] = None
-    fecha_apertura: datetime
+    fecha_apertura: Optional[datetime] = None
     fecha_cierre: Optional[datetime] = None
-    total_ventas: Decimal
+    total_ventas: Optional[Decimal] = Decimal(0)
     efectivo_real: Optional[Decimal] = None
     estado: str
     usuario_apertura_nombre: Optional[str] = None
