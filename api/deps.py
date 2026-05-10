@@ -18,15 +18,7 @@ def get_db():
     finally:
         db.close()
 
-def _is_expired(expires_at):
-    """Compara expires_at sin importar si es naive o aware."""
-    if not expires_at:
-        return False
-    now = datetime.utcnow()
-    # Si viene con timezone (aware), le quitamos la zona para poder comparar
-    if expires_at.tzinfo is not None:
-        expires_at = expires_at.replace(tzinfo=None)
-    return expires_at < now
+from core import security
 
 def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
@@ -37,14 +29,16 @@ def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_
     if not token:
         raise credentials_exception
 
-    session = db.query(models.UserSession).filter(models.UserSession.token == token).first()
-    if not session:
+    payload = security.decode_token(token)
+    if not payload or payload.get("type") != "access":
+        # Si no es válido o expiró, levantamos 401
         raise credentials_exception
     
-    if _is_expired(session.expires_at):
+    username = payload.get("sub")
+    if not username:
         raise credentials_exception
-    
-    user = session.user
+
+    user = db.query(models.Usuario).filter(models.Usuario.username == username).first()
     if not user:
         raise credentials_exception
     
@@ -54,10 +48,12 @@ def get_optional_user(db: Session = Depends(get_db), token: Optional[str] = Depe
     if not token:
         return None
     try:
-        session = db.query(models.UserSession).filter(models.UserSession.token == token).first()
-        if not session or _is_expired(session.expires_at):
+        payload = security.decode_token(token)
+        if not payload or payload.get("type") != "access":
             return None
-        return session.user
+        
+        username = payload.get("sub")
+        return db.query(models.Usuario).filter(models.Usuario.username == username).first()
     except Exception as e:
         logger.error(f"Error en get_optional_user: {str(e)}")
         return None

@@ -15,13 +15,10 @@ router = APIRouter()
 def login(login_data: schemas.UserCreate, db: Session = Depends(deps.get_db)):
     user = db.query(models.Usuario).filter(models.Usuario.username == login_data.username).first()
     
-    # bcrypt tiene un límite de 72 bytes para el texto plano de la contraseña.
-    # Truncamos manualmente para evitar errores de la librería.
     plain_password = login_data.password[:72] if login_data.password else ""
     
     if not user or not security.verify_password(plain_password, user.password):
         logger.warning(f"Intento de login fallido para: {login_data.username}")
-
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuario o contraseña incorrectos",
@@ -38,39 +35,29 @@ def login(login_data: schemas.UserCreate, db: Session = Depends(deps.get_db)):
     if user_rol:
         role = user_rol.rol.nombre.lower()
 
-    # Generar Opaque Token y guardarlo en DB
-    logger.info(f"Generando token para {user.username}...")
-    token_str = security.create_opaque_token()
+    # Generar JWT Tokens
+    access_token = security.create_access_token(subject=user.username)
+    refresh_token = security.create_refresh_token(subject=user.username)
     
-    # Usar datetime con zona horaria UTC explícita para evitar problemas con SQLAlchemy/SQLite
-    now = datetime.now(timezone.utc)
-    expires = now + timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
-    
+    # Opcional: Guardar en DB para permitir revocación
     try:
-        logger.info(f"Intentando guardar sesión para usuario {user.id}...")
+        now = datetime.now(timezone.utc)
         new_session = models.UserSession(
-            token=token_str,
+            token=access_token,
             user_id=user.id,
-            expires_at=expires,
+            expires_at=now + timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES),
             created_at=now
         )
         db.add(new_session)
         db.commit()
-        logger.info("Sesión guardada exitosamente en la base de datos.")
     except Exception as e:
         db.rollback()
-        logger.error(f"ERROR CRÍTICO AL GUARDAR SESIÓN: {str(e)}")
-        # Devolvemos el error detallado temporalmente para diagnosticar en Render
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Error en base de datos: {str(e)}"
-        )
+        logger.error(f"Error guardando sesión: {str(e)}")
 
-
-    logger.info(f"Login exitoso: {user.username} (Rol: {role})")
+    logger.info(f"Login exitoso (JWT): {user.username} (Rol: {role})")
     return {
-        "token": token_str,
-        "refresh": token_str, # Usamos el mismo token opaco para el refresh para compatibilidad con el frontend
+        "token": access_token,
+        "refresh": refresh_token,
         "role": role,
         "username": user.username,
         "nombre": user.nombre_completo or user.username,
@@ -84,37 +71,27 @@ def refresh_token(refresh_data: dict, db: Session = Depends(deps.get_db)):
     if not token:
         raise HTTPException(status_code=400, detail="Refresh token requerido")
     
-    session = db.query(models.UserSession).filter(models.UserSession.token == token).first()
-    if not session or (session.expires_at and session.expires_at < datetime.utcnow()):
-        if session:
-            db.delete(session)
-            db.commit()
-        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+    payload = security.decode_token(token)
+    if not payload or payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Refresh token inválido o expirado")
     
-    user = session.user
+    username = payload.get("sub")
+    user = db.query(models.Usuario).filter(models.Usuario.username == username).first()
     if not user:
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
-    # Renovar el token
-    new_token_str = security.create_opaque_token()
-    expires = datetime.utcnow() + timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
-    
-    # Actualizar la sesión actual o crear una nueva y borrar la vieja
-    session.token = new_token_str
-    session.expires_at = expires
-    db.commit()
+    # Generar nuevo Access Token
+    new_access_token = security.create_access_token(subject=user.username)
 
-    return {"token": new_token_str}
+    return {"token": new_access_token}
 
 @router.post("/logout/")
 def logout(db: Session = Depends(deps.get_db), token: str = Depends(deps.oauth2_scheme)):
-    if not token:
-        return {"detail": "No se proporcionó token"}
-        
-    session = db.query(models.UserSession).filter(models.UserSession.token == token).first()
-    if session:
-        db.delete(session)
-        db.commit()
-        logger.info(f"Sesión cerrada exitosamente para token: {token[:10]}...")
-        
+    # Con JWT stateless el logout es opcional en el servidor (a menos que usemos blacklist)
+    # Por ahora simplemente borramos si existe en UserSession
+    if token:
+        session = db.query(models.UserSession).filter(models.UserSession.token == token).first()
+        if session:
+            db.delete(session)
+            db.commit()
     return {"detail": "Sesión cerrada correctamente"}
