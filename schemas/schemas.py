@@ -3,7 +3,7 @@ from typing import List, Optional, Union
 from datetime import datetime
 from decimal import Decimal
 
-# Base schemas
+# Esquemas base
 class UserBase(BaseModel):
     username: str
     email: Optional[str] = None
@@ -27,7 +27,7 @@ class User(UserBase):
     class Config:
         from_attributes = True
 
-# Token schemas
+# Esquemas de token
 class Token(BaseModel):
     token: str
     refresh: str
@@ -43,7 +43,7 @@ class TokenData(BaseModel):
 class TokenRefreshResponse(BaseModel):
     token: str
 
-# Role schemas
+# Esquemas de rol
 class RolBase(BaseModel):
     nombre: str
 
@@ -55,7 +55,7 @@ class Rol(RolBase):
     class Config:
         from_attributes = True
 
-# Category schemas
+# Esquemas de categoría
 class CategoriaBase(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
@@ -69,7 +69,7 @@ class Categoria(CategoriaBase):
     class Config:
         from_attributes = True
 
-# Product schemas
+# Esquemas de producto
 class ProductoBase(BaseModel):
     nombre: str
     precio: Decimal
@@ -92,7 +92,7 @@ class Producto(ProductoBase):
     class Config:
         from_attributes = True
 
-# Order schemas
+# Esquemas de pedido
 class PedidoProductoBase(BaseModel):
     producto_id: Optional[int] = None
     cantidad: int
@@ -143,7 +143,7 @@ class PedidoUpdate(BaseModel):
     estado_nombre: Optional[str] = None
     total: Optional[Decimal] = None
 
-# Mesa schemas
+# Esquemas de mesa
 class MesaBase(BaseModel):
     numero: int
     capacidad: Optional[int] = 1
@@ -165,7 +165,7 @@ class Mesa(MesaBase):
     class Config:
         from_attributes = True
 
-# State schemas
+# Esquemas de estado
 class EstadoBase(BaseModel):
     nombre: str
 
@@ -174,7 +174,7 @@ class Estado(EstadoBase):
     class Config:
         from_attributes = True
 
-# Config schemas
+# Esquemas de configuración
 class EmpresaConfigUpdate(BaseModel):
     nombre: Optional[str] = None
     nit: Optional[str] = None
@@ -198,7 +198,7 @@ class EmpresaConfig(EmpresaConfigBase):
     class Config:
         from_attributes = True
 
-# Movimiento Inventario schemas
+# Esquemas de movimiento de inventario
 class TipoMovimientoBase(BaseModel):
     nombre: str
 
@@ -226,7 +226,7 @@ class MovimientoInventario(MovimientoInventarioBase):
     class Config:
         from_attributes = True
 
-# Turno schemas
+# Esquemas de turno
 class TurnoBase(BaseModel):
     base_inicial: Decimal = Decimal(0)
     observaciones: Optional[str] = None
