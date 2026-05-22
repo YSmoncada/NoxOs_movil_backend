@@ -40,20 +40,6 @@ finally:
 
 app = FastAPI(title="Mandala API (FastAPI)")
 
-# Middleware de diagnóstico para ver errores reales en Render
-@app.middleware("http")
-async def db_diagnostic_middleware(request: Request, call_next):
-    try:
-        return await call_next(request)
-    except Exception as e:
-        import traceback
-        error_msg = f"ERROR NO CONTROLADO: {str(e)}\n{traceback.format_exc()}"
-        logger.error(error_msg)
-        return JSONResponse(
-            status_code=500,
-            content={"detail": f"Error interno: {str(e)}", "traceback": error_msg}
-        )
-
 
 # Configurar CORS
 

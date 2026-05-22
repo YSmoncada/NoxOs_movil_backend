@@ -125,16 +125,6 @@ class EmpresaConfig(Base):
     moneda = Column(String(10), default="$")
     impuesto_porcentaje = Column(Numeric(5, 2), default=0)
 
-class TokenBlacklist(Base):
-    __tablename__ = "token_blacklist"
-    id = Column(Integer, primary_key=True, index=True)
-    token = Column(String(255), unique=True, index=True)
-    user_id = Column(Integer, ForeignKey("usuarios.id"))
-    expires_at = Column(DateTime(timezone=True))
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    user = relationship("Usuario")
-
 class Turno(Base):
     __tablename__ = "turnos"
     id = Column(Integer, primary_key=True, index=True)
@@ -159,12 +149,3 @@ class Turno(Base):
     def usuario_cierre_nombre(self):
         return self.usuario_cierre.username if self.usuario_cierre else None
 
-class UserSession(Base):
-    __tablename__ = "user_sessions"
-    id = Column(Integer, primary_key=True, index=True)
-    token = Column(String(255), unique=True, index=True)
-    user_id = Column(Integer, ForeignKey("usuarios.id"))
-    expires_at = Column(DateTime(timezone=True))
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    user = relationship("Usuario")
